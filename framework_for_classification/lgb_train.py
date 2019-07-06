@@ -153,8 +153,6 @@ if __name__ == "__main__":
 
     logger.info('data preparation end {}'.format(train[selected_features].shape))
 
-    logger.info('Paramter tuning by BayesSearch')
-
     X_test = test[selected_features].values
 
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
