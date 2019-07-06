@@ -182,7 +182,7 @@ if __name__ == "__main__":
 
     sub_df = pd.DataFrame({"ID_code":test["ID_code"].values})
     sub_df["target"] = predictions
-    sub_df.to_csv("../result/submission_xgb.csv", index=False)
+    sub_df.to_csv("../result/submission_xgb_"+"str(score)"+".csv", index=False)
 
     logger.info('record submission contents')
     path = "../result/xgboost_submission_sofar.csv"

@@ -181,7 +181,7 @@ if __name__ == "__main__":
 
     sub_df = pd.DataFrame({"ID_code":test["ID_code"].values})
     sub_df["target"] = predictions
-    sub_df.to_csv("../result/submission_gb"+str(score)+".csv", index=False)
+    sub_df.to_csv("../result/submission_gb_"+str(score)+".csv", index=False)
 
     logger.info('record submission contents')
     path = "../result/gradientboost_submission_sofar.csv"
