@@ -183,7 +183,8 @@ if __name__ == "__main__":
         data = pd.DataFrame()
         data["ID_code"] = sub_df["ID_code"]
     data = pd.concat([data, sub_df["target"]], axis=1)
-    data = data.rename(columns={'target': start_time})
+    data = data.rename(columns={'target': str(start_time.year)+"/"+str(start_time.month)+"/"+str(start_time.day)+
+                                "/"+str(start_time.hour)+":"+str(start_time.minute)+"/"+str(mean_auc)[:7]}) 
     data.to_csv(path, index=None)
 
     logger.info('end')

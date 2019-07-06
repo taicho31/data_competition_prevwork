@@ -185,11 +185,11 @@ if __name__ == "__main__":
     path = "../result/catboost_submission_sofar.csv"
     if os.path.isfile(path):
         data = pd.read_csv(path)
-        data[[str(start_time)]] = sub_df["target"]
     else:
         data = pd.DataFrame()
         data["ID_code"] = sub_df["ID_code"]
-        data[[str(start_time)]] = sub_df["target"]
+    data = pd.concat([data, sub_df["target"]], axis=1)
+    data = data.rename(columns={'target':str(start_time.year)+"/"+str(start_time.month)+"/"+str(start_time.day)+"/"+str(start_time.hour)+":"+str(start_time.minute)+"/"+str(mean_auc)[:7]})
     data.to_csv(path, index=None)
 
     logger.info('end')
