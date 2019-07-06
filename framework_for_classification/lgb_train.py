@@ -218,7 +218,7 @@ if __name__ == "__main__":
     # submission
     sub_df = pd.DataFrame({"ID_code":test["ID_code"].values})
     sub_df["target"] = predictions['target']
-    sub_df.to_csv("../result/submission_lgb."+str(mean_auc)+"csv", index=False)
+    sub_df.to_csv("../result/submission_lgb."+str(mean_auc)+".csv", index=False)
 
     # record
     logger.info('record submission contents')
