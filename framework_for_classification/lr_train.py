@@ -6,8 +6,6 @@ from sklearn.metrics import roc_auc_score, roc_curve, mean_squared_error
 from sklearn.model_selection import StratifiedKFold
 from skopt import BayesSearchCV
 import warnings
-from imblearn.under_sampling import RandomUnderSampler
-from imblearn.combine import SMOTEENN
 import pickle
 from tqdm import tqdm
 from logging import StreamHandler, DEBUG, Formatter, FileHandler, getLogger
@@ -26,6 +24,7 @@ TRAIN_MOD_STD = '../input/train_mod_std.feather'
 TEST_MOD_STD = '../input/test_mod_std.feather'
 
 DIR = '../result/logfile'
+CLASS = 2
 
 def status_print(optim_result):
     """Status callback durring bayesian hyperparameter search"""
@@ -144,16 +143,16 @@ if __name__ == "__main__":
 
     logger.info('Predictions')
     folds = StratifiedKFold(n_splits=10, shuffle=False, random_state=44000)
-    oof = np.zeros(len(train))
-    predictions = np.zeros(len(test))
+    oof = np.zeros((len(train), CLASS))
+    predictions = np.zeros((len(test), CLASS))
 
     for fold_, (trn_idx, val_idx) in enumerate(folds.split(train.values, target.values)):
         logger.info('Fold {}'.format(fold_+1))
         lr = LogisticRegression(**params)
         lr.fit(train.iloc[trn_idx][selected_features], target.iloc[trn_idx])
-        oof[val_idx] = lr.predict_proba(train.iloc[val_idx][selected_features])[:,1]
+        oof[val_idx] = lr.predict_proba(train.iloc[val_idx][selected_features])[:,1].reshape(CLASS, 1)
 
-        predictions += lr.predict_proba(test[selected_features])[:, 1] / folds.n_splits
+        predictions += lr.predict_proba(test[selected_features])[:, 1].reshape(CLASS, 1) / folds.n_splits
 
         logger.debug("CV score: {:<8.5f}".format(roc_auc_score(target, oof)))
 

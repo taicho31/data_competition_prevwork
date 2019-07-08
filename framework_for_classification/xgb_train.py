@@ -29,6 +29,7 @@ TRAIN_MOD_STD = '../input/train_mod_std.feather'
 TEST_MOD_STD = '../input/test_mod_std.feather'
 
 DIR = '../result/logfile'
+CLASS = 2
 
 def status_print(optim_result):
     """Status callback durring bayesian hyperparameter search"""
@@ -160,9 +161,9 @@ if __name__ == "__main__":
         logger.info("Fold {}".format(fold_+1))
         xgb_model = xgb.XGBClassifier(**params)
         xgb_model.fit(train.iloc[trn_idx][selected_features], target.iloc[trn_idx])
-        oof[val_idx] = xgb_model.predict_proba(train.iloc[val_idx][selectedfeatures])[:,1]
+        oof[val_idx] = xgb_model.predict_proba(train.iloc[val_idx][selectedfeatures])[:,1].reshape(CLASS, 1)
 
-        predictions += xgb_model.predict_proba(test[selected_features])[:,1] / folds.n_splits
+        predictions += xgb_model.predict_proba(test[selected_features])[:,1].reshape(CLASS, 1) / folds.n_splits
 
         logger.debug("CV score: {:<8.5f}".format(roc_auc_score(target, oof)))
 

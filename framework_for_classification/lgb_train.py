@@ -2,8 +2,6 @@ import pandas as pd
 import lightgbm as lgb
 import numpy as np
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import Perceptron, LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, GradientBoostingClassifier
 from sklearn.metrics import roc_auc_score, roc_curve, mean_squared_error
 from sklearn.model_selection import StratifiedKFold
 from sklearn.svm import SVC
