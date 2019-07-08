@@ -1,14 +1,12 @@
 import pandas as pd
 import lightgbm as lgb
 import numpy as np
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score, roc_curve, mean_squared_error
 from sklearn.model_selection import StratifiedKFold
 from sklearn.svm import SVC
 import feather
 import warnings
 import pickle
-from tqdm import tqdm
 from logging import StreamHandler, DEBUG, Formatter, FileHandler, getLogger
 import os
 import datetime

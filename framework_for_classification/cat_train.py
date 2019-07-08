@@ -1,22 +1,16 @@
 import pandas as pd
 import numpy as np
 import feather
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score, roc_curve, mean_squared_error
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from skopt import BayesSearchCV
-from scipy.stats import norm
-from imblearn.under_sampling import RandomUnderSampler
-from imblearn.combine import SMOTEENN
 from catboost import CatBoostClassifier,Pool
 import os
 import pickle
-from tqdm import tqdm
 from logging import StreamHandler, DEBUG, Formatter, FileHandler, getLogger
 import warnings
 from datetime import datetime
-import csv
 warnings.filterwarnings('ignore')
 
 logger = getLogger(__name__)
@@ -162,7 +156,7 @@ if __name__ == "__main__":
 
         predictions += cat.predict_proba(test[selected_features])[:,1].reshape(CLASS, 1) / folds.n_splits
 
-        logger.debug('CV score: {:<8.5f}'.format(roc_auc_score(target, oof)))
+        logger.debug('CV score: {:<8.5f}'.format(roc_auc_score(target.iloc[val_idx], oof[val_idx])))
 
     logger.info('train end')
 
