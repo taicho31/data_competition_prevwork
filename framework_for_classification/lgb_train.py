@@ -183,10 +183,8 @@ if __name__ == "__main__":
                        )
             p_valid += lgb_clf.predict(X_valid)
             yp += lgb_clf.predict(X_test)
-        fold_importance_df = pd.DataFrame()
-        fold_importance_df["feature"] = selected_features
-        fold_importance_df["importance_fold"+str(i)] = lgb_clf.feature_importance()
-        feature_importance_df = pd.concat([feature_importance_df, fold_importance_df], axis=0)
+        feature_importance_df["feature"] = selected_features
+        feature_importance_df["importance_fold"+str(i)] = lgb_clf.feature_importance()
         oof['predict'][val_idx] = p_valid/N
         val_score = roc_auc_score(y_valid, p_valid)
         val_aucs.append(val_score)
