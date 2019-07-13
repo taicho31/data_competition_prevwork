@@ -4,7 +4,6 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score, roc_curve, mean_squared_error
 from sklearn.model_selection import StratifiedKFold
-from sklearn.svm import SVC
 import feather
 import warnings
 import pickle
@@ -153,7 +152,8 @@ if __name__ == "__main__":
     predictions = test[['Id']]
     val_aucs = []
     feature_importance_df = pd.DataFrame()
-
+    feature_importance_df["feature"] = selected_features
+    
     for fold, (trn_idx, val_idx) in enumerate(skf.split(train, train['SalePrice'])):
         print("fold: {}" .format(fold+1))
         X_train, y_train = train.iloc[trn_idx][selected_features], train.iloc[trn_idx]['SalePrice']
@@ -193,8 +193,6 @@ if __name__ == "__main__":
             
         p_valid = lgb_clf.predict(X_valid)
         yp = lgb_clf.predict(X_test)
-        fold_importance_df = pd.DataFrame()
-        fold_importance_df["feature"] = selected_features
         fold_importance_df["importance_fold"+str(i)] = lgb_clf.feature_importance()
         feature_importance_df = pd.concat([feature_importance_df, fold_importance_df], axis=0)
         oof['predict'][val_idx] = p_valid
