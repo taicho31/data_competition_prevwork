@@ -15,11 +15,8 @@ warnings.filterwarnings('ignore')
 
 logger = getLogger(__name__)
 
-TRAIN_MOD = '../input/train_mod.feather'
-TEST_MOD = '../input/test_mod.feather'
-
-TRAIN_MOD_STD = '../input/train_mod_std.feather'
-TEST_MOD_STD = '../input/test_mod_std.feather'
+TRAIN = '../input/train_mod.feather'
+TEST = '../input/test_mod.feather'
 
 DIR = '../result/logfile'
 CLASS = 2
@@ -44,7 +41,7 @@ def status_print(optim_result):
 
 if __name__ == "__main__":
     
-    start_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+    start_time = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
     
     log_fmt = Formatter('%(asctime)s %(name)s %(lineno)d [%(levelname)s][%(funcName)s] %(message)s ')
     handler = StreamHandler()
@@ -63,19 +60,17 @@ if __name__ == "__main__":
     logger.info('RandomForest classifier')
     logger.info('install data')
 
-    train = feather.read_dataframe(TRAIN_MOD)
-    test = feather.read_dataframe(TEST_MOD)
+    train = feather.read_dataframe(TRAIN)
+    test = feather.read_dataframe(TEST)
     
-    #train_mod_std = feather.read_dataframe(TRAIN_MOD_STD)
-    #test_mod_std = feather.read_dataframe(TEST_MOD_STD)
-    
-    features = [c for c in train.columns if c not in ['ID_code', 'target']]
-    target = train['target']
+    id_feature = ""
+    target_feature = ""
 
+    features = [c for c in train.columns if c not in [id_feature, target_feature]]
+    target= train[target_feature]
     logger.info('data install complete')
 
     logger.info('feature importances')
-
     rf = RandomForestClassifier(random_state=0)
     rf.fit(train[features], target)
     importances = list(rf.feature_importances_)
@@ -97,13 +92,10 @@ if __name__ == "__main__":
             break
 
     use_cols = train[selected_features].columns.values
-    
     logger.debug('train columns: {} {}'.format(use_cols.shape, use_cols))
-    
     logger.info('data preparation end {}'.format(train[selected_features].shape))
     
     logger.info('Paramter tuning by BayesSearch')
-
     params = {'random_state': 0, 'n_jobs':-1, 'class_weight': "balanced"}
     bayes_cv_tuner = BayesSearchCV(
                                    estimator = RandomForestClassifier(random_state=0, n_jobs=-1, class_weight = "balanced"),
@@ -146,7 +138,7 @@ if __name__ == "__main__":
     else:
         current.to_csv(path)
 
-    logger.info('Predictions')
+    logger.info('Learning start')
     folds = StratifiedKFold(n_splits=10, shuffle=False, random_state=44000)
     oof = np.zeros((len(train), CLASS))
     predictions = np.zeros((len(test), CLASS))
@@ -162,23 +154,23 @@ if __name__ == "__main__":
 
         logger.debug('CV score: {:<8.5f}'.format(roc_auc_score(target.iloc[val_idx], oof[val_idx])))
 
-    logger.info('train end')
+    logger.info('Learning end')
 
     score = roc_auc_score(target, oof)
-    oof = pd.DataFrame(oof, columns=[str(start_time)])
+    oof = pd.DataFrame(oof, columns=[str(start_time)+str(i) for i in target_feature])
 
     logger.info('record oof')
     path = "../result/randomforest_oof.csv"
     if os.path.isfile(path):
         data = pd.read_csv(path)
     else:
-        data = oof[['ID_code', 'target']]
-    data = pd.concat([data, oof['predict']], axis=1)
-    data = data.rename(columns={'predict': start_time})
+        data = pd.DataFrame()
+    data[[str(start_time)+str(i) for i in target_feature]] = oof
     data.to_csv(path, index=None)
 
-    sub_df = pd.DataFrame({"ID_code":test["ID_code"].values})
-    sub_df["target"] = predictions
+    logger.info('make submission file')
+    sub_df = pd.DataFrame({str(id_feature):test[id_feature].values})
+    sub_df[target_feature] = predictions
     sub_df.to_csv("../result/submission_rfc_"+str(score)+".csv", index=False)
 
     logger.info('record submission contents')
@@ -187,9 +179,9 @@ if __name__ == "__main__":
         data = pd.read_csv(path)
     else:
         data = pd.DataFrame()
-        data["ID_code"] = sub_df["ID_code"]
-    data = pd.concat([data, sub_df["target"]], axis=1)
-    data = data.rename(columns={'target': str(start_time.year)+"/"+str(start_time.month)+"/"+str(start_time.day)+
+        data[id_feature] = sub_df[id_feature]
+    data = pd.concat([data, sub_df[target_feature]], axis=1)
+    data = data.rename(columns={str(target_feature): str(start_time.year)+"/"+str(start_time.month)+"/"+str(start_time.day)+
                                 "/"+str(start_time.hour)+":"+str(start_time.minute)+"/"+str(mean_auc)[:7]})
     data.to_csv(path, index=None)
     
