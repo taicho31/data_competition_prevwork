@@ -130,8 +130,8 @@ if __name__ == "__main__":
     logger.info('Learning start')
     for fold, (trn_idx, val_idx) in enumerate(skf.split(train, target)):
         print("fold: {}" .format(fold+1))
-        X_train, y_train = train.iloc[trn_idx][selected_features], target.iloc[trn_idx]
-        X_valid, y_valid = train.iloc[val_idx][selected_features], target.iloc[val_idx]
+        X_train, y_train = train.iloc[trn_idx][features], target.iloc[trn_idx]
+        X_valid, y_valid = train.iloc[val_idx][features], target.iloc[val_idx]
 
         N = 1
         p_valid,yp = 0,0
