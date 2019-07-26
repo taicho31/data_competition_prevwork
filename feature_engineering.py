@@ -6,6 +6,7 @@ import feather
 from sklearn.preprocessing import StandardScaler
 import warnings
 from scipy.stats import norm, rankdata
+import sys
 from logging import StreamHandler, DEBUG, Formatter, FileHandler, getLogger
 warnings.filterwarnings('ignore')
 
@@ -100,8 +101,14 @@ logger.setLevel(DEBUG)
 logger.addHandler(handler)
     
 logger.info('start')
-    
 logger.info('Feature Engineering')
+
+args = sys.argv
+id_feature = args[1]
+target_feature = args[2]
+print("id_feature", id_feature)
+print("target_feature", target_feature)
+
 logger.info('install data')
 
 train = feather.read_dataframe(TRAIN)
@@ -111,11 +118,8 @@ logger.debug(test.head(5))
 logger.info('training data shape: {}'. format(train.shape))
 logger.info('test data shape: {}'. format(test.shape))
 
-id_feature = ""
-target_feature = ""
-
 # -------------------------------------------------------------------------------
-features = [c for c in train.columns if c not in [[id_feature, target_feature]]]
+features = [c for c in train.columns if c not in [id_feature, target_feature]]
 
 logger.info('--------------feature engineering start-------------')
 for df in [train, test]:#要約統計量

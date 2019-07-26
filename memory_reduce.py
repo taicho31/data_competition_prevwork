@@ -4,6 +4,7 @@ from tqdm import tqdm
 from logging import getLogger
 import feather
 import warnings
+import sys
 from logging import StreamHandler, DEBUG, Formatter, FileHandler, getLogger
 warnings.filterwarnings('ignore')
 
@@ -97,10 +98,17 @@ logger.setLevel(DEBUG)
 logger.addHandler(handler)
     
 logger.info('start')
-    
 logger.info('Memory Reduce')
+
+args = sys.argv
+id_feature = args[1]
+target_feature = args[2]
+print("id_feature", id_feature)
+print("target_feature", target_feature)
+print(args)
+
 logger.info('install data')
-    
+
 train = pd.read_csv(TRAIN_DATA)
 test = pd.read_csv(TEST_DATA)
 logger.debug(train.head(5))
@@ -108,11 +116,8 @@ logger.debug(test.head(5))
 logger.info('training data shape: {}'. format(train.shape))
 logger.info('test data shape: {}'. format(test.shape))
 
-id_feature = "ID_code"
-target_feature = "target"
-
 # -------------------------------------------------------------------------------
-features = [c for c in train.columns if c not in [[id_feature, target_feature]]]
+features = [c for c in train.columns if c not in [id_feature, target_feature]]
 
 logger.info('--------------memory reduce start-------------')
 logger.debug('training data shape after adding new features: {}'. format(train.shape))
