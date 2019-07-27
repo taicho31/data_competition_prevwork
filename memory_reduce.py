@@ -91,7 +91,7 @@ handler.setLevel('INFO')
 handler.setFormatter(log_fmt)
 logger.addHandler(handler)
     
-handler = FileHandler(DIR + 'memory_reduce.log', 'a')
+handler = FileHandler(DIR + '_memory_reduce.log', 'a')
 handler.setLevel(DEBUG)
 handler.setFormatter(log_fmt)
 logger.setLevel(DEBUG)

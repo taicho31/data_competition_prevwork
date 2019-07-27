@@ -94,7 +94,7 @@ handler.setLevel('INFO')
 handler.setFormatter(log_fmt)
 logger.addHandler(handler)
     
-handler = FileHandler(DIR + 'feature_engineering.log', 'a')
+handler = FileHandler(DIR + '_feature_engineering.log', 'a')
 handler.setLevel(DEBUG)
 handler.setFormatter(log_fmt)
 logger.setLevel(DEBUG)
