@@ -21,23 +21,6 @@ TEST = '../input/test.feather'
 
 DIR = '../result/logfile'
 
-def status_print(optim_result):
-    """Status callback durring bayesian hyperparameter search"""
-
-    # Get all the models tested so far in DataFrame format
-    all_models = pd.DataFrame(bayes_cv_tuner.cv_results_)
-
-    # Get current parameters and the best parameters
-    best_params = pd.Series(bayes_cv_tuner.best_params_)
-    logger.debug('Model #{}\nBest ROC-AUC: {}\nBest params: {}\n'.format(
-                len(all_models),
-                np.round(bayes_cv_tuner.best_score_, 4),
-                bayes_cv_tuner.best_params_))
-
-    # Save all model results
-    clf_name = bayes_cv_tuner.estimator.__class__.__name__
-    all_models.to_csv("../result/logfile/bayesiantuning/"+clf_name+"_cv_results.csv")
-
 start_time = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
 log_fmt = Formatter('%(asctime)s %(name)s %(lineno)d [%(levelname)s][%(funcName)s] %(message)s ')
 handler = StreamHandler()
