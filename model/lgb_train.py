@@ -2,8 +2,7 @@ import pandas as pd
 import lightgbm as lgb
 import numpy as np
 from sklearn.metrics import roc_auc_score, roc_curve, mean_squared_error
-from sklearn.model_selection import StratifiedKFold
-from sklearn.svm import SVC
+from sklearn.model_selection import StratifiedKFold, train_test_split, cross_val_predict
 import feather
 import warnings
 import pickle
@@ -14,8 +13,8 @@ import datetime
 from functools import partial
 import optuna
 from sklearn.feature_selection import RFE
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import cross_val_predict
+from hyperopt import hp, tpe, Trials, fmin
+from hyperopt import space_eval
 warnings.filterwarnings('ignore')
 
 logger = getLogger(__name__)
@@ -27,23 +26,6 @@ DIR = '../result/logfile'
 
 random_state = 42
 np.random.seed(random_state)
-
-def status_print(optim_result):
-    """Status callback durring bayesian hyperparameter search"""
-
-    # Get all the models tested so far in DataFrame format
-    all_models = pd.DataFrame(bayes_cv_tuner.cv_results_)
-
-    # Get current parameters and the best parameters
-    best_params = pd.Series(bayes_cv_tuner.best_params_)
-    logger.debug('Model #{}\nBest ROC-AUC: {}\nBest params: {}\n'.format(
-            len(all_models),
-            np.round(bayes_cv_tuner.best_score_, 4),
-            bayes_cv_tuner.best_params_))
-
-    # Save all model results
-    clf_name = bayes_cv_tuner.estimator.__class__.__name__
-    all_models.to_csv("../result/logfile/bayesiantuning/"+clf_name+"_cv_results.csv")
 
 # Data augmentation for model development and leaning ---------------------------
 def augment(x,y,t=2):
@@ -91,22 +73,33 @@ def objective(X, y, trial):
     metric = roc_auc_score(y_train, y_pred[:, 1])
     return metric
 
-params = {
+opt_params = {
     "objective" : "binary", # or "regression"
     "metric" : "auc", # or rmse
-    "boosting": 'gbdt',
+    "bagging_seed" : random_state,
+    "verbosity" : 1,
+    "seed": random_state,
+    "tree_learner": "serial",
     "max_depth" : -1,
+    "boost_from_average": "false",
+    "boosting": 'gbdt',
     "num_leaves" : 13,
     "learning_rate" : 0.01,
     "bagging_freq": 5,
     "bagging_fraction" : 0.4,
     "feature_fraction" : 0.05,
     "min_data_in_leaf": 80,
-    "tree_learner": "serial",
-    "boost_from_average": "false",
+}
+
+check_params = {
+    "objective" : "binary", # or "regression"
+    "metric" : "auc", # or rmse
     "bagging_seed" : random_state,
     "verbosity" : 1,
-    "seed": random_state
+    "seed": random_state,
+    "tree_learner": "serial",
+    "max_depth" : -1,
+    "boost_from_average": "false"
 }
 
 start_time = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
@@ -142,10 +135,10 @@ X_test = test_df.values
 logger.info('data install complete')
 
 logger.info('Determine Feature Selection Num by Optuna and RFE')
-tmp_features = features #[c for c in features if "int" in str(train[c].dtype) or "float" in str(train[c].dtype)][:20]
+tmp_features = [c for c in features if "int" in str(train[c].dtype) or "float" in str(train[c].dtype)][:20]
 f = partial(objective, train[tmp_features], target)
 study = optuna.create_study(direction='maximize') # optimize by optuna
-study.optimize(f, n_trials=10) # 20 trials
+study.optimize(f, n_trials=3)
 print('no of params:', study.best_params["n_features_to_select"]) # output discovered parameters
 feature_num = study.best_params["n_features_to_select"]
 logger.info('Determine Feature Selection Num End')
@@ -153,18 +146,75 @@ logger.info('Determine Feature Selection Num End')
 logger.info('Feature Selection by RFE')
 clf = lgb.LGBMClassifier(n_estimators=100, random_state=42)
 rfe = RFE(estimator=clf, n_features_to_select=feature_num,verbose=1)
-# 特徴量の選択と評価のためにデータを分割する 計算量が許すのであれば k-Fold した方が bias は小さくなるはず
 X_train, X_eval, y_train, y_eval = train_test_split(train[tmp_features], target, shuffle=True, random_state=42)
 rfe.fit(X_eval, y_eval) # Learning by RFE
 
-#print('Feature ranking by RFF:', rfe.ranking_) # ranking of variables by RFE
 train_selected = train[tmp_features].iloc[:, rfe.support_]
 selected_features = list(train_selected.columns)
 logger.info("Selected features:", selected_features)
 logger.info('Feature Selection End')
 
-logger.info('Learning start')
+logger.info('Parameter tuning')
 
+X = train[selected_features]
+Y = target
+
+def para_tuning_obj(params):
+    params = {
+        'bagging_freq': int(params['bagging_freq']),
+        'bagging_fraction': float(params['bagging_fraction']),
+        'num_leaves': int(params['num_leaves']),
+        'feature_fraction': float(params['feature_fraction']),
+        'learning_rate': float(params['learning_rate']),
+        'min_data_in_leaf': int(params['min_data_in_leaf']),
+        'min_sum_hessian_in_leaf': int(params['min_sum_hessian_in_leaf']),
+        'boosting': params['boosting'],
+    #'colsample_bytree': '{:.3f}'.format(params['colsample_bytree']),
+}
+    
+    score = []
+    clf = lgb.LGBMClassifier(objective="binary", metric="auc", seed= random_state,
+                             verbose=1, bagging_seed = random_state, tree_learner= "serial",
+                             max_depth = -1, boost_from_average= "false", **params)
+    skf = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
+    for trn_idx, val_idx in skf.split(X, Y):
+        clf.fit(X.iloc[trn_idx], Y.iloc[trn_idx])
+        predicts = clf.predict(X.iloc[val_idx])
+        score.append(roc_auc_score(Y.iloc[val_idx], predicts))
+    
+    return -1 * np.mean(score)
+
+trials = Trials()
+
+space ={
+    'bagging_freq': hp.quniform('bagging_freq', 1, 10, 1),
+    'bagging_fraction': hp.uniform('bagging_fraction', 0.2, 1.0),
+    'num_leaves': hp.quniform('num_leaves', 8, 128, 1),
+    'feature_fraction': hp.uniform('feature_fraction', 0.2, 1.0),
+    'learning_rate': hp.uniform('learning_rate', 0.001, 0.1),
+    'min_data_in_leaf': hp.quniform('min_data_in_leaf', 8, 128, 1),
+    'min_sum_hessian_in_leaf': hp.quniform('min_sum_hessian_in_leaf', 5, 30, 1),
+    'boosting': hp.choice('boosting', ['gbdt', 'dart', 'rf']),
+    #'colsample_bytree': hp.uniform('colsample_bytree', 0.3, 1.0)
+}
+
+best = fmin(
+            para_tuning_obj,
+            space = space,
+            algo=tpe.suggest,
+            max_evals=2,
+            trials=trials,
+            verbose=1
+            )
+
+logger.info(best) # check the optimal parameters
+best = space_eval(space, best)
+check_params.update(best)
+check_params['num_leaves'] = int(check_params['num_leaves'])
+check_params['min_data_in_leaf'] = int(check_params['min_data_in_leaf'])
+check_params['bagging_freq'] = int(check_params['bagging_freq'])
+
+logger.info('Learning start')
 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
 oof = train_df[[id_feature, target_feature]]
 oof['predict'] = 0
@@ -187,7 +237,7 @@ for fold, (trn_idx, val_idx) in enumerate(skf.split(train, target)):
         trn_data = lgb.Dataset(X_t, label=y_t)
         val_data = lgb.Dataset(X_valid, label=y_valid)
         evals_result = {}
-        lgb_clf = lgb.train(params,
+        lgb_clf = lgb.train(check_params, #opt_params
                         trn_data,
                         100000,
                         valid_sets = [trn_data, val_data],
@@ -211,6 +261,7 @@ all_auc = roc_auc_score(oof[target_feature], oof['predict'])
 #all_mse = np.sqrt(mean_squared_error(oof[target_feature], oof['predict'])) "if regression"
 logger.debug("Mean auc: %.9f, std: %.9f. All auc: %.9f." % (mean_auc, std_auc, all_auc))
 
+# record out-of-fold contents
 logger.info('record oof')
 path = "../result/lgb_oof.csv"
 if os.path.isfile(path):
@@ -229,7 +280,7 @@ sub_df = pd.DataFrame({str(id_feature):test[id_feature].values})
 sub_df[target_feature] = predictions[target_feature]
 sub_df.to_csv("../result/submission_lgb_"+str(mean_auc)+".csv", index=False)
 
-# record
+# record submission contents
 logger.info('record submission contents')
 path = "../result/lgb_submission_sofar.csv"
 if os.path.isfile(path):
