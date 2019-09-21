@@ -8,6 +8,7 @@ import warnings
 from scipy.stats import norm, rankdata
 import sys
 from logging import StreamHandler, DEBUG, Formatter, FileHandler, getLogger
+import category_encoders as ce
 warnings.filterwarnings('ignore')
 
 TRAIN = '../input/train.feather'
@@ -21,7 +22,7 @@ DIR = '../result/logfile'
 logger = getLogger(__name__)
 
 # reduce memory when creating modified data ----------------
-#Based on this great kernel https://www.kaggle.com/arjanso/reducing-dataframe-memory-size-by-65
+#Based on this great kernel
 def reduce_mem_usage(df):
     start_mem_usg = df.memory_usage().sum() / 1024**2
     print("Memory usage of properties dataframe is :",start_mem_usg," MB")
@@ -131,7 +132,7 @@ for df in [train, test]:#要約統計量
     df["median"] = df.iloc[:,2:].median(axis=1)
     df["mean"] = df.iloc[:,2:].mean(axis=1)
 
-features = [c for c in train.columns if not c in ["target", "ID_code", "max", "min", "skew", "kurtosis", "median", "std", "mean"]]
+features = [c for c in train.columns if not c in ["target", "ID_code", "max", "min", "skew", "kurtosis", "median", "std", "mean"]  and c != id_feature and c != target_feature]
 
 for df in [train, test]:
     for feature in features:
@@ -145,6 +146,13 @@ for df in [train, test]:
 #for df in [train, test]:
 #    if feature != "var_81":
 #        df["diff_var_81_"+feature] = train[feature] - train["var_81"]
+
+# category to variables
+list_cols = list([c for c in train.columns if "object" in str(train[c].dtype)])
+# 序数をカテゴリに付与して変換
+ce_oe = ce.OrdinalEncoder(cols=list_cols,handle_unknown='impute')
+train = ce_oe.fit_transform(train)
+train[target_feature] = train[target_feature] - 1
 
 logger.info('--------------feature engineering finish-------------')
 
@@ -174,33 +182,6 @@ logger.info('Writing modified test data to a feather files...')
 feather.write_dataframe(test, TEST_MOD)
 
 logger.info('end')
-    
-# modified standardized data -----------------------------------------------------------------
-#features = [c for c in train.columns if c not in ['ID_code', 'target']]
-
-#logger.info('Standardize modified data')
-
-#X_train_mod_std = train[features].copy()
-#X_test_mod_std = test[features].copy()
-
-#for col in features:
-#       X_train_mod_std[col] = ((X_train_mod_std[col] - X_train_mod_std[col].mean())
-#                               / X_train_mod_std[col].std()).astype('float32')
-
-#       X_test_mod_std[col] = ((X_test_mod_std[col] - X_test_mod_std[col].mean())
-#                              / X_test_mod_std[col].std()).astype('float32')
-
-#train_idcode_target = pd.DataFrame(train[["ID_code","target"]])
-#train_mod_std = pd.concat([train_idcode_target, X_train_mod_std], axis=1)
-
-#test_idcode = pd.DataFrame(test["ID_code"])
-#test_mod_std = pd.concat([test_idcode, X_test_mod_std], axis=1)
-
-#logger.info('Writing modified standardized train to a feather files...')
-#feather.write_dataframe(train_mod_std, TRAIN_MOD_STD)
-
-#logger.info('Writing modified standardized test to a feather files...')
-#feather.write_dataframe(test_mod_std, TEST_MOD_STD)
 
 
 
