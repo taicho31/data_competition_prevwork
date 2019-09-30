@@ -254,6 +254,24 @@ print(classification_report(target, oof_prediction))
 
 predictions[target_feature] = np.argmax(yp, axis=1)
 
+# check accuracy considering the highest K classes in prediction
+#K = 3
+#unsorted_max_indices = np.argpartition(-oof, K)[:,:K]
+#y = []
+#for i in range(unsorted_max_indices.shape[0]):
+#    y.append(oof[i, unsorted_max_indices[i]])
+#y = np.array(y)
+#indices = np.argsort(-y, axis=1)
+#max_k_indices = []
+#for i in range(indices.shape[0]):
+#    max_k_indices.append(list(unsorted_max_indices[i][indices[i]]))
+#max_k_indices = np.array(max_k_indices)
+#count = 0
+#for i in range(unsorted_max_indices.shape[0]):
+#    if target[i] in max_k_indices[i]:
+#        count += 1
+#print(count * 100 / unsorted_max_indices.shape[0])
+
 #logger.info('-------------record oof contents-------------')
 #path = "../result/lgb_oof.csv"
 #if os.path.isfile(path):
