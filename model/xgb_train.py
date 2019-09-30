@@ -76,7 +76,7 @@ feature_importance_df["feature"] = features
 yp = np.zeros((test.shape[0] ,CLASS))
 
 for fold_, (trn_idx, val_idx) in enumerate(folds.split(train.values, target.values)):
-    logger.info("Fold {}".format(fold_+1))
+    print("Fold {}".format(fold_+1))
     xgb_model = xgb.XGBClassifier(**params)
     xgb_model.fit(train.iloc[trn_idx][features], target.iloc[trn_idx])
     
