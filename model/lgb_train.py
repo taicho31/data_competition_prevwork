@@ -1,7 +1,7 @@
 import pandas as pd
 import lightgbm as lgb
 import numpy as np
-from sklearn.metrics import roc_auc_score, roc_curve, mean_squared_error
+from sklearn.metrics import confusion_matrix, log_loss, classification_report, accuracy_score, roc_auc_score, roc_curve, mean_squared_error
 from sklearn.model_selection import StratifiedKFold, train_test_split, cross_val_predict
 import feather
 import warnings
@@ -134,29 +134,29 @@ target = train_df[target_feature]
 X_test = test_df.values
 logger.info('data install complete')
 
-logger.info('Determine Feature Selection Num by Optuna and RFE')
-tmp_features = [c for c in features if "int" in str(train[c].dtype) or "float" in str(train[c].dtype)][:20]
-f = partial(objective, train[tmp_features], target)
-study = optuna.create_study(direction='maximize') # optimize by optuna
-study.optimize(f, n_trials=3)
-print('no of params:', study.best_params["n_features_to_select"]) # output discovered parameters
-feature_num = study.best_params["n_features_to_select"]
-logger.info('Determine Feature Selection Num End')
+#logger.info('---------Determine Feature Selection Num by Optuna and RFE----------')
+#tmp_features = [c for c in features if "int" in str(train[c].dtype) or "float" in str(train[c].dtype)][:20]
+#f = partial(objective, train[tmp_features], target)
+#study = optuna.create_study(direction='maximize') # optimize by optuna
+#study.optimize(f, n_trials=3)
+#print('no of params:', study.best_params["n_features_to_select"]) # output discovered parameters
+#feature_num = study.best_params["n_features_to_select"]
+#logger.info('Determine Feature Selection Num End')
 
-logger.info('Feature Selection by RFE')
-clf = lgb.LGBMClassifier(n_estimators=100, random_state=42)
-rfe = RFE(estimator=clf, n_features_to_select=feature_num,verbose=1)
-X_train, X_eval, y_train, y_eval = train_test_split(train[tmp_features], target, shuffle=True, random_state=42)
-rfe.fit(X_eval, y_eval) # Learning by RFE
+#logger.info('---------Feature Selection by RFE----------')
+#clf = lgb.LGBMClassifier(n_estimators=100, random_state=42)
+#rfe = RFE(estimator=clf, n_features_to_select=feature_num,verbose=1)
+#X_train, X_eval, y_train, y_eval = train_test_split(train[tmp_features], target, shuffle=True, random_state=42)
+#rfe.fit(X_eval, y_eval) # Learning by RFE
 
-train_selected = train[tmp_features].iloc[:, rfe.support_]
-selected_features = list(train_selected.columns)
-logger.info("Selected features:", selected_features)
-logger.info('Feature Selection End')
+#train_selected = train[tmp_features].iloc[:, rfe.support_]
+#selected_features = list(train_selected.columns)
+#logger.info("Selected features:", selected_features)
+#logger.info('Feature Selection End')
 
-logger.info('Parameter tuning')
+logger.info('-----------Parameter tuning------------')
 
-X = train[selected_features]
+X = train[features]
 Y = target
 
 def para_tuning_obj(params):
@@ -198,14 +198,7 @@ space ={
     #'colsample_bytree': hp.uniform('colsample_bytree', 0.3, 1.0)
 }
 
-best = fmin(
-            para_tuning_obj,
-            space = space,
-            algo=tpe.suggest,
-            max_evals=2,
-            trials=trials,
-            verbose=1
-            )
+best = fmin(para_tuning_obj, space = space, algo=tpe.suggest, max_evals=2, trials=trials, verbose=1)
 
 logger.info(best) # check the optimal parameters
 best = space_eval(space, best)
@@ -214,74 +207,69 @@ check_params['num_leaves'] = int(check_params['num_leaves'])
 check_params['min_data_in_leaf'] = int(check_params['min_data_in_leaf'])
 check_params['bagging_freq'] = int(check_params['bagging_freq'])
 
-logger.info('Learning start')
-skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
-oof = train_df[[id_feature, target_feature]]
-oof['predict'] = 0
+logger.info('-----------Learning start------------')
+CLASS = 9
+n_folds = 5
+folds = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+oof = np.zeros((len(train_df),CLASS))
 predictions = pd.DataFrame(test_df[id_feature])
 val_aucs = []
 feature_importance_df = pd.DataFrame()
 feature_importance_df["feature"] = features
+yp = np.zeros((test.shape[0] ,CLASS))
 
-for fold, (trn_idx, val_idx) in enumerate(skf.split(train, target)):
+for fold, (trn_idx, val_idx) in enumerate(folds.split(train, target)):
     print("fold: {}" .format(fold+1))
-    X_train, y_train = train.iloc[trn_idx][selected_features], target.iloc[trn_idx]
-    X_valid, y_valid = train.iloc[val_idx][selected_features], target.iloc[val_idx]
+    X_train, y_train = train.iloc[trn_idx][features], target.iloc[trn_idx]
+    X_valid, y_valid = train.iloc[val_idx][features], target.iloc[val_idx]
 
-    N = 1
-    p_valid,yp = 0,0
-    for i in range(N):
-        X_t, y_t = augment(X_train.values, y_train.values)
-        X_t = pd.DataFrame(X_t)
-
-        trn_data = lgb.Dataset(X_t, label=y_t)
-        val_data = lgb.Dataset(X_valid, label=y_valid)
-        evals_result = {}
-        lgb_clf = lgb.train(check_params, #opt_params
+    trn_data = lgb.Dataset(X_train, label=y_train)
+    val_data = lgb.Dataset(X_valid, label=y_valid)
+    lgb_clf = lgb.train(check_params, #opt_params
                         trn_data,
                         100000,
                         valid_sets = [trn_data, val_data],
                         early_stopping_rounds=3000,
-                        verbose_eval = 1000,
-                        evals_result=evals_result
+                        verbose_eval = 1000
                        )
-        p_valid += lgb_clf.predict(X_valid)
-        yp += lgb_clf.predict(X_test)
-    feature_importance_df["importance_fold"+str(i)] = lgb_clf.feature_importance()
-    oof['predict'][val_idx] = p_valid/N
-    val_score = roc_auc_score(y_valid, p_valid)
-    #val_score = np.sqrt(mean_squared_error(np.log(y_valid), np.log(p_valid))) "if regression"
+    valid_result = lgb_clf.predict(X_valid, num_iteration = lgb_clf.best_iteration)
+    yp += lgb_clf.predict(test[selected_features], num_iteration = lgb_clf.best_iteration) / n_folds
+    oof[val_idx] = valid_result
+    val_score = roc_auc_score(y_valid, np.argmax(valid_result, axis=1))
     val_aucs.append(val_score)
-    predictions['fold{}'.format(fold+1)] = yp/N
+    feature_importance_df["importance_fold"+str(i)] = lgb_clf.feature_importance()
+
 logger.info('Learning End')
 
+
+logger.info('-------Performance check and prediction-------')
 mean_auc = np.mean(val_aucs)
 std_auc = np.std(val_aucs)
-all_auc = roc_auc_score(oof[target_feature], oof['predict'])
-#all_mse = np.sqrt(mean_squared_error(oof[target_feature], oof['predict'])) "if regression"
+
+oof_prediction = np.argmax(oof, axis=1)
+all_auc = roc_auc_score(target, oof_prediction)
 logger.debug("Mean auc: %.9f, std: %.9f. All auc: %.9f." % (mean_auc, std_auc, all_auc))
+print(confusion_matrix(target, oof_prediction))
+print(classification_report(target, oof_prediction))
 
-# record out-of-fold contents
-logger.info('record oof')
-path = "../result/lgb_oof.csv"
-if os.path.isfile(path):
-    data = pd.read_csv(path)
-else:
-    data = oof[[id_feature, target_feature]]
-data = pd.concat([data, oof['predict']], axis=1)
-data = data.rename(columns={'predict': start_time})
-data.to_csv(path, index=None)
+predictions[target_feature] = np.argmax(yp, axis=1)
 
-predictions[target_feature] = np.mean(predictions[[col for col in predictions.columns if col not in [id_feature, target_feature]]].values, axis=1)
+#logger.info('-------------record oof contents-------------')
+#path = "../result/lgb_oof.csv"
+#if os.path.isfile(path):
+#    data = pd.read_csv(path)
+#else:
+#    data = oof[[id_feature, target_feature]]
+#data = pd.concat([data, oof['predict']], axis=1)
+#data = data.rename(columns={'predict': start_time})
+#data.to_csv(path, index=None)
 
-# submission
-logger.info('make submission file')
+logger.info('-------------make submission file-------------')
 sub_df = pd.DataFrame({str(id_feature):test[id_feature].values})
 sub_df[target_feature] = predictions[target_feature]
 sub_df.to_csv("../result/submission_lgb_"+str(mean_auc)+".csv", index=False)
 
-# record submission contents
-logger.info('record submission contents')
+logger.info('-------------record submission contents-------------')
 path = "../result/lgb_submission_sofar.csv"
 if os.path.isfile(path):
     data = pd.read_csv(path)
