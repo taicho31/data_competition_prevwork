@@ -233,7 +233,7 @@ for fold, (trn_idx, val_idx) in enumerate(folds.split(train, target)):
                         verbose_eval = 1000
                        )
     valid_result = lgb_clf.predict(X_valid, num_iteration = lgb_clf.best_iteration)
-    yp += lgb_clf.predict(test[selected_features], num_iteration = lgb_clf.best_iteration) / n_folds
+    yp += lgb_clf.predict(test[features], num_iteration = lgb_clf.best_iteration) / n_folds
     oof[val_idx] = valid_result
     val_score = roc_auc_score(y_valid, np.argmax(valid_result, axis=1))
     val_aucs.append(val_score)
