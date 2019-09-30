@@ -211,9 +211,9 @@ logger.info('-----------Learning start------------')
 CLASS = 9
 n_folds = 5
 folds = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)
-oof = np.zeros((len(train_df),CLASS))
-predictions = pd.DataFrame(test_df[id_feature])
-val_aucs = []
+oof = np.zeros((len(train),CLASS))
+predictions = pd.DataFrame(test[id_feature])
+val_scores = []
 feature_importance_df = pd.DataFrame()
 feature_importance_df["feature"] = features
 yp = np.zeros((test.shape[0] ,CLASS))
@@ -236,19 +236,18 @@ for fold, (trn_idx, val_idx) in enumerate(folds.split(train, target)):
     yp += lgb_clf.predict(test[features], num_iteration = lgb_clf.best_iteration) / n_folds
     oof[val_idx] = valid_result
     val_score = roc_auc_score(y_valid, np.argmax(valid_result, axis=1))
-    val_aucs.append(val_score)
+    val_scores.append(val_score)
     feature_importance_df["importance_fold"+str(i)] = lgb_clf.feature_importance()
 
 logger.info('Learning End')
 
-
 logger.info('-------Performance check and prediction-------')
-mean_auc = np.mean(val_aucs)
-std_auc = np.std(val_aucs)
+mean_score = np.mean(val_scores)
+std_score = np.std(val_scores)
 
 oof_prediction = np.argmax(oof, axis=1)
-all_auc = roc_auc_score(target, oof_prediction)
-logger.debug("Mean auc: %.9f, std: %.9f. All auc: %.9f." % (mean_auc, std_auc, all_auc))
+all_score = roc_auc_score(target, oof_prediction)
+logger.debug("Mean score: %.9f, std: %.9f. All score: %.9f." % (mean_score, std_score, all_score))
 print(confusion_matrix(target, oof_prediction))
 print(classification_report(target, oof_prediction))
 
