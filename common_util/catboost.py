@@ -35,6 +35,8 @@ def accuracy_class(train, test, fea, select_flg):
     "early_stopping_rounds":100,}
 
     valid = pd.DataFrame(np.zeros([X_train.shape[0]]))
+    features_list = [i for i in X_train.columns if i != "installation_id"]
+    feature_importance_df = pd.DataFrame(features_list, columns=["Feature"])
     for i , (train_index, test_index) in enumerate(skf.split(X_train, y_train, X_train["installation_id"])):
         print("Fold "+str(i+1))
         X_train2 = X_train.iloc[train_index,:]
@@ -56,6 +58,7 @@ def accuracy_class(train, test, fea, select_flg):
         
         models.append(clf)
         valid.iloc[test_index] = test_predict[:,1].reshape(X_test2.shape[0], 1)
+        feature_importance_df["Fold_"+str(i+1)] = clf.get_feature_importance()
     print("logloss = \t {}".format(log_loss(y_train, valid)))
     print("ROC = \t {}".format(roc_auc_score(y_train, valid)))
     print('Accuracy score = \t {}'.format(accuracy_score(y_train, np.round(valid))))
@@ -63,11 +66,15 @@ def accuracy_class(train, test, fea, select_flg):
     print('Recall score =   \t {}'.format(recall_score(y_train, np.round(valid))))
     print('F1 score =      \t {}'.format(f1_score(y_train, np.round(valid))))
     print(confusion_matrix(y_train, np.round(valid)))
+    feature_importance_df["Average"] = np.mean(feature_importance_df.iloc[:,1:n_folds+1], axis=1)
+    feature_importance_df["Std"] = np.std(feature_importance_df.iloc[:,1:n_folds+1], axis=1)
+    feature_importance_df["Cv"] = feature_importance_df["Std"] / feature_importance_df["Average"]
     pred_value = np.zeros([X_test.shape[0]])
     for model in models:
         pred_value += model.predict(X_test, prediction_type = "Probability")[:,1] / len(models)
-    return pred_value, valid
+    return pred_value, valid, feature_importance_df
 
-tmp = df_for_classification.sort_values("Cv", ascending = True).reset_index(drop=True).copy()
-feat = tmp[tmp.index <= 120]["Feature"]
-pred_value, valid = accuracy_class(new_train, new_test, feat, False)
+#tmp = df_for_classification.sort_values("Cv", ascending = True).reset_index(drop=True).copy()
+#feat = tmp[tmp.index <= 120]["Feature"]
+feat = []
+pred_value, valid, feat_df  = accuracy_class(new_train, new_test, feat, False)
