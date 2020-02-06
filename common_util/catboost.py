@@ -1,3 +1,7 @@
+# https://catboost.ai/docs/concepts/python-reference_catboost_predict.html
+# https://catboost.ai/docs/concepts/python-reference_catboostclassifier.html
+from catboost import CatBoost
+from catboost import Pool
 def accuracy_class(train, test, fea, select_flg):
     X_train = train.drop(['accuracy_group'],axis=1) 
     y_train = train.accuracy_group.copy()
