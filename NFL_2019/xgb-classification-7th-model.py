@@ -359,16 +359,17 @@ def transform_data(df):
 
     return df_single
 
-
-
-
-get_ipython().run_cell_magic('time', '', "train_single = transform_data(train)\ny_train = train_single.Yards + 99 # to categorize\nX_train = train_single.drop(['Yards'],axis=1)\nfor f in X_train.columns:\n    if X_train[f].dtype=='object': \n        lbl = preprocessing.LabelEncoder()\n        lbl.fit(list(X_train[f])+[-999])\n        X_train[f] = lbl.transform(list(X_train[f]))")
+train_single = transform_data(train)
+y_train = train_single.Yards + 99 # to categorize
+X_train = train_single.drop(['Yards'],axis=1)
+for f in X_train.columns:
+    if X_train[f].dtype=='object': 
+        lbl = preprocessing.LabelEncoder()
+        lbl.fit(list(X_train[f])+[-999])
+        X_train[f] = lbl.transform(list(X_train[f]))
 
 
 # # modelling
-
-
-
 n_folds=5
 kf=KFold(n_splits = n_folds, random_state=1125)
 average_crps = 0
