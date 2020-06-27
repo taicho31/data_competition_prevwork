@@ -1,4 +1,7 @@
 # https://www.kaggle.com/c/ieee-fraud-detection/discussion/104603
+#LiLightGbm USE : lgb.train(fobj=focal_binary_object)
+#Xgboost USE : xgb.train(obj =focal_binary_object)
+
 def robust_pow(num_base, num_pow):
     # numpy does not permit negative numbers to fractional power
     # use this to perform the power algorithmic
