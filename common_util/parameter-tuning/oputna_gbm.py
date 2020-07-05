@@ -4,7 +4,7 @@ import optuna.integration.lightgbm as lgb ###### optuna ######
 import json
 
 categoricals = []
-def modelling_optuna(new_train, new_test):
+def modelling_optuna(new_train):
     X_train = new_train.drop(['target'],axis=1).copy()
     y_train = new_train.target.copy()
     
@@ -17,21 +17,13 @@ def modelling_optuna(new_train, new_test):
         if (X_train[i].std() == 0) and i not in remove_features:
             remove_features.append(i)
     X_train = X_train.drop(remove_features, axis=1)
-    X_test = new_test.copy()
-    X_test = X_test.drop(remove_features, axis=1)
-    
     X_train.columns = ["".join (c if c.isalnum() else "_" for c in str(x)) for x in X_train.columns]
-    X_test.columns = ["".join (c if c.isalnum() else "_" for c in str(x)) for x in X_test.columns]
 
     n_folds=5
     skf=StratifiedKFold(n_splits = n_folds, shuffle=True, random_state=0)
-    models = []
 
     valid = np.array([])
-    valid_lgb = pd.DataFrame(np.zeros([X_train.shape[0]]))
     real = np.array([])
-    features_list = [i for i in X_train.columns if i != "chip_id"]
-    feature_importance_df = pd.DataFrame(features_list, columns=["Feature"])
     mean_score = 0
     best_params_list = []
     for i , (train_index, test_index) in enumerate(skf.split(X_train, y_train)):
@@ -57,28 +49,20 @@ def modelling_optuna(new_train, new_test):
         valid_predict = clf.predict(X_test2, num_iteration = clf.best_iteration)
         mean_score += average_precision_score(y_test2,valid_predict) / n_folds
         valid = np.concatenate([valid, valid_predict])
-        valid_lgb.iloc[test_index]  = clf.predict(X_test2, num_iteration = clf.best_iteration).reshape(X_test2.shape[0], 1)
         real = np.concatenate([real, y_test2])
-        #feature_importance_df["Fold_"+str(i+1)] = clf.feature_importance()
-        #models.append(clf)
         
         #pd.DataFrame(tuning_history).to_csv('./tuning_history.csv')
         best_params_list.append(best_params)
     
-    for j in range(n_folds):
-        print('Fold: ' + str(j+1) + ' Best parameters: ' + json.dumps(best_params_list[j], indent=4))
+    #for j in range(n_folds):
+    #    print('Fold: ' + str(j+1) + ' Best parameters: ' + json.dumps(best_params_list[j], indent=4))
 
     #print('Best parameters: ' + json.dumps(best_params, indent=4))
-    #feature_importance_df["Average"] = np.mean(feature_importance_df.iloc[:,1:n_folds+1], axis=1)
-    #feature_importance_df["Std"] = np.std(feature_importance_df.iloc[:,1:n_folds+1], axis=1)
-    #feature_importance_df["Cv"] = feature_importance_df["Std"] / feature_importance_df["Average"]
 
     score = average_precision_score(real, valid)
     print("mean score = {}".format(mean_score))
     print("average precision score = {}".format(score))
-    #pred_value = np.zeros(X_test.shape[0])
-    #for model in models:
-    #    pred_value += model.predict(X_test, num_iteration = model.best_iteration) / len(models)
-    return score, feature_importance_df #, pred_value
+    return best_params_list
 
-metric_skf, feature_importance_df_skf = modelling_optuna(new_train, new_test)
+best_params_list = modelling_optuna(new_train)
+best_params_list
