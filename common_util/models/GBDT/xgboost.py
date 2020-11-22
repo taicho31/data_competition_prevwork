@@ -5,19 +5,8 @@ def modelling_xgb(new_train, new_test):
     y_train = new_train.accuracy_group.copy()
     y_train.loc[y_train<=1]=0
     y_train.loc[y_train>=2]=1
-    lbl = preprocessing.LabelEncoder()
-    lbl.fit(list(X_train["installation_id"]))
-    X_train["installation_id"] = lbl.transform(list(X_train["installation_id"]))
-    remove_features = [i for i in X_train.columns if "_4235" in i or i == "world_"+str(activities_world["NONE"])] #or i in to_exclude]
-    for i in X_train.columns:
-        if X_train[i].std() == 0 and i not in remove_features:
-            remove_features.append(i)
-    X_train = X_train.drop(remove_features, axis=1)
-    X_train = X_train[sorted(X_train.columns.tolist())]
 
     X_test = new_test.drop(["installation_id","accuracy_group", "game_session"], axis=1)
-    X_test = X_test.drop(remove_features, axis=1)
-    X_test = X_test[sorted(X_test.columns.tolist())]
 
     n_folds=5
     skf=GroupKFold(n_splits = n_folds)
@@ -32,8 +21,10 @@ def modelling_xgb(new_train, new_test):
     "num_leaves" : 13,
     "learning_rate" : 0.01,
     }
-
+    
+    pred_value = np.zeros([X_test.shape[0]])
     valid = pd.DataFrame(np.zeros([X_train.shape[0]]))
+    X_test = xgb.DMatrix(X_test)
     for i , (train_index, test_index) in enumerate(skf.split(X_train, y_train, X_train["installation_id"])):
         print("Fold "+str(i+1))
         X_train2 = X_train.iloc[train_index,:]
@@ -56,9 +47,9 @@ def modelling_xgb(new_train, new_test):
         #feval=crps_score,
     )
 
-        models.append(clf)
         test_predict = clf.predict(xgb_eval, ntree_limit=clf.best_ntree_limit)            
         valid.iloc[test_index] = test_predict.reshape(X_test2.shape[0], 1)
+        pred_value += model.predict(X_test, ntree_limit=clf.best_ntree_limit) / n_folds
         if i == 0:
             feature_importance_df = pd.DataFrame(list(clf.get_score(importance_type="total_gain").keys()), columns=["Features"])
         feature_importance_df["fold_"+str(i)] = pd.DataFrame.from_dict(clf.get_score(importance_type="total_gain").values())
@@ -74,9 +65,6 @@ def modelling_xgb(new_train, new_test):
     print('Recall score =   \t {}'.format(recall_score(y_train, np.round(valid))))
     print('F1 score =      \t {}'.format(f1_score(y_train, np.round(valid))))
     print(confusion_matrix(y_train, np.round(valid)))
-    pred_value = np.zeros([X_test.shape[0]])
-    X_test = xgb.DMatrix(X_test)
-    for model in models:
         pred_value += model.predict(X_test, ntree_limit=clf.best_ntree_limit) / len(models)
     return pred_value, valid, feature_importance_df
 pred_value, valid, feature_importance_df = modelling_xgb(new_train, new_test)
