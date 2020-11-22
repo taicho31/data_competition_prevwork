@@ -1,5 +1,6 @@
 # https://xgboost.readthedocs.io/en/latest/parameter.html
 import xgboost as xgb
+
 def modelling_xgb(new_train, new_test):
     X_train = new_train.drop(['accuracy_group', 'game_session'],axis=1).copy()
     y_train = new_train.accuracy_group.copy()
@@ -10,7 +11,7 @@ def modelling_xgb(new_train, new_test):
 
     n_folds=5
     skf=GroupKFold(n_splits = n_folds)
-    models = []
+    
     xgb_params = {
     "objective" : "binary:logistic",
     "eval_metric" : "auc",
@@ -58,13 +59,7 @@ def modelling_xgb(new_train, new_test):
     feature_importance_df["Std"] = np.std(feature_importance_df.iloc[:,1:n_folds+1], axis=1)
     feature_importance_df["Cv"] = feature_importance_df["Std"] / feature_importance_df["Average"]
 
-    print("logloss = \t {}".format(log_loss(y_train, valid)))
-    print("ROC = \t {}".format(roc_auc_score(y_train, valid)))
-    print('Accuracy score = \t {}'.format(accuracy_score(y_train, np.round(valid))))
-    print('Precision score = \t {}'.format(precision_score(y_train, np.round(valid))))
-    print('Recall score =   \t {}'.format(recall_score(y_train, np.round(valid))))
-    print('F1 score =      \t {}'.format(f1_score(y_train, np.round(valid))))
-    print(confusion_matrix(y_train, np.round(valid)))
-        pred_value += model.predict(X_test, ntree_limit=clf.best_ntree_limit) / len(models)
+    print("logloss = \t {}".format(log_loss(y_train, valid))
+)
     return pred_value, valid, feature_importance_df
 pred_value, valid, feature_importance_df = modelling_xgb(new_train, new_test)
