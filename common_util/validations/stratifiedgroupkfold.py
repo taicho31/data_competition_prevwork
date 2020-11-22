@@ -1,5 +1,6 @@
 # https://www.kaggle.com/jakubwasikowski/stratified-group-k-fold-cross-validation
 from collections import defaultdict
+from collections import Counter
 
 def stratified_group_k_fold(X, y, groups, k, seed=None):
     labels_num = np.max(y) + 1
