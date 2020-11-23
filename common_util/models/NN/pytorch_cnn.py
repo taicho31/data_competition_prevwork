@@ -59,18 +59,13 @@ class Net(nn.Module):
     def forward(self, x, x_aux):
         #https://stackoverflow.com/questions/59090533/how-do-i-add-some-gaussian-noise-to-a-tensor-in-pytorch GaussianNoise(gauss_rate)
         x = x + self.gauss_rate * torch.randn(x.shape[0], 2, 511) 
-        #print("1:", x.shape)
         x = self.drop1(self.batch1(F.relu(self.conv1(x))))
-        #print("2:", x.shape)
         x = self.drop2(self.batch2(F.relu(self.conv2(x))))
-        #print("3:", x.shape)
         x = self.drop3(self.batch3(F.relu(self.conv3(x))))
-        #print("4:", x.shape)
         
         # https://discuss.pytorch.org/t/global-max-pooling/1345 (x = GlobalMaxPool1D(x))
         # https://www.xn--ebkc7kqd.com/entry/pytorch-pooling
         x, _ = torch.max(x, 2)
-        #print("5:", x.shape)
         
         # https://discuss.pytorch.org/t/concatenate-layer-output-with-additional-input-data/20462 (x = Concatenate()([x, x_aux]))
         x = torch.cat((x, x_aux), dim=1)
@@ -124,7 +119,8 @@ def modelling_torch(tr, target, te, exc_wl, exc_wl_test,sample_seed):
         
         train_loader = torch.utils.data.DataLoader(train, batch_size=batch_size, shuffle=True) 
         valid_loader = torch.utils.data.DataLoader(valid, batch_size=batch_size, shuffle=False)
-        
+       
+        best_loss = np.inf 
         for epoch in range(train_epochs):
             start_time = time.time()
             clf.train()
@@ -156,13 +152,15 @@ def modelling_torch(tr, target, te, exc_wl, exc_wl_test,sample_seed):
                 epoch + 1, train_epochs, avg_loss, avg_val_loss, elapsed_time))
             scheduler.step()
             #print('Epoch-{0} lr: {1}'.format(epoch, optimizer.param_groups[0]['lr']))
+           
+            if best_loss > avg_val_loss:
+                torch.save(clf.state_dict(), 'best-model-parameters.pt')
+                best_loss = avg_val_loss
         
         oof = np.concatenate([oof, valid])
         real = np.concatenate([real, target_fold])
             
-        
         # https://discuss.pytorch.org/t/how-to-save-the-best-model/84608 (save best model)
-        torch.save(clf.state_dict(), 'best-model-parameters.pt')
         pred_model = Net(n_filter= 64, filter_size=7, drop_rate=0.2, gauss_rate = 0.07)
         pred_model.load_state_dict(torch.load('best-model-parameters.pt'))
         
