@@ -2,11 +2,9 @@
 # https://catboost.ai/docs/concepts/python-reference_catboostclassifier.html
 from catboost import CatBoost
 from catboost import Pool
-def accuracy_class(train, test, fea, select_flg):
+def accuracy_class(train, test):
     X_train = train.drop(['accuracy_group'],axis=1) 
     y_train = train.accuracy_group.copy()
-    y_train.loc[y_train <=1] = 0
-    y_train.loc[y_train >=2] = 1
 
     X_test = test.drop(["installation_id","accuracy_group"], axis=1)
     n_folds=5
