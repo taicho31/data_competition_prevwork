@@ -1,5 +1,3 @@
-# data_competition_prevwork
-
 # Kaggle competitions
 - santa2018: https://www.kaggle.com/c/traveling-santa-2018-prime-paths
 - Santander_CTP2019: https://www.kaggle.com/c/santander-customer-transaction-prediction
