@@ -1,5 +1,6 @@
 # https://github.com/alok-ai-lab/DeepInsight
 # https://static-content.springer.com/esm/art%3A10.1038%2Fs41598-019-47765-6/MediaObjects/41598_2019_47765_MOESM1_ESM.pdf
+# https://www.kaggle.com/markpeng/deepinsight-transforming-non-image-data-to-images
 
 class LogScaler:
     def __init__(self):
