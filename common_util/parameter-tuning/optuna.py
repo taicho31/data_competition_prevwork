@@ -82,7 +82,8 @@ class ParamSearchByOptuna():
 
         return study
 
-search = ParamSearchByOptuna(data = train[feature+[target]], 
+if __name__ == "__main__":
+    search = ParamSearchByOptuna(data = train[feature+[target]], 
                              target_variable = target,
                              valid_scheme = StratifiedKFold, 
                              n_splits = 5, 
@@ -94,5 +95,5 @@ search = ParamSearchByOptuna(data = train[feature+[target]],
                              verbose_eval = 30
                    )
 
-study = search.execute()
-print(study.best_trial.params)
+    study = search.execute()
+    print(study.best_trial.params)
