@@ -1,6 +1,10 @@
 # Kaggle competitions
-- santa2018: https://www.kaggle.com/c/traveling-santa-2018-prime-paths
-- Santander_CTP2019: https://www.kaggle.com/c/santander-customer-transaction-prediction
-- NFL_2019: https://www.kaggle.com/c/nfl-big-data-bowl-2020/overview
-- DSB2019: https://www.kaggle.com/c/data-science-bowl-2019
-
+- 01_santa2018: https://www.kaggle.com/c/traveling-santa-2018-prime-paths
+- 02_Santander_CTP2019: https://www.kaggle.com/c/santander-customer-transaction-prediction
+- 03_NFL_2019: https://www.kaggle.com/c/nfl-big-data-bowl-2020/overview
+- 04_DSB2019: https://www.kaggle.com/c/data-science-bowl-2019
+- 05_ARC2020: https://www.kaggle.com/competitions/abstraction-and-reasoning-challenge
+- 06_Moa2020: https://www.kaggle.com/competitions/lish-moa
+- 07_Riiid2020: https://www.kaggle.com/competitions/riiid-test-answer-prediction
+- 08_Indoor2021: https://www.kaggle.com/competitions/indoor-location-navigation
+- 09_HMrecom2022: https://www.kaggle.com/c/h-and-m-personalized-fashion-recommendations/
