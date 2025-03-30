@@ -26,7 +26,7 @@ class Common_LGB_Modelling:
 
         return model
 
-    def train_and_valid(self, x_tr, y_tr, x_val, y_val, params):
+    def train_and_valid(self, x_tr, y_tr, x_val, y_val, params, cat_features = "auto"):
 
         if self.custom_callback:
             callbacks = self.custom_callback
@@ -34,7 +34,7 @@ class Common_LGB_Modelling:
             callbacks = self.default_callback
 
         model = self.model_class(**params)
-        model = model.fit(x_tr, y_tr, eval_set=[(x_val, y_val)], callbacks=callbacks)
+        model = model.fit(x_tr, y_tr, eval_set=[(x_val, y_val)], categorical_feature = cat_features, callbacks=callbacks)
         valid_pred = model.predict(x_val)
 
         return model, valid_pred
@@ -96,7 +96,7 @@ class Common_CB_Modelling:
                 early_stopping_rounds=50,
                 verbose_eval=100,
             )
-            valid_pred = model.predict_proba(x_val)[:, 1]
+            valid_pred = model.predict_proba(x_val)#[:, 1]
         elif isinstance(model, CatBoostRegressor):
             model.fit(
                 train_pool,
@@ -110,7 +110,7 @@ class Common_CB_Modelling:
 
     def test(self, models, test):
         if isinstance(models[0], CatBoostClassifier):
-            test_pred = [model.predict_proba(test)[:, 1] for model in models]
+            test_pred = [model.predict_proba(test) for model in models] # [:, 1]
         elif isinstance(models[0], CatBoostRegressor):
             test_pred = [model.predict(test) for model in models]
         test_pred = np.mean(test_pred, axis=0)
@@ -121,7 +121,7 @@ class Common_CB_Modelling:
         for idx in range(0, len(test), batch_size):
             if isinstance(models[0], CatBoostClassifier):
                 test_pred_batch = [
-                    model.predict_proba(test.iloc[idx : idx + batch_size])[:, 1]
+                    model.predict_proba(test.iloc[idx : idx + batch_size])#[:, 1]
                     for model in models
                 ]
             elif isinstance(models[0], CatBoostRegressor):
@@ -155,23 +155,31 @@ class Common_XGB_Modelling:
     Train, test data and target should be the same data type. (Pandas or Numpy)
     """
 
-    def __init__(self, model_class):
+    def __init__(self, model_class, verbose_eval_step):
         self.model_class = model_class
+        self.verbose_eval_step = verbose_eval_step
 
-    def train_and_valid(self, x_tr, y_tr, x_val, y_val, params):
+    def train_and_valid(self, x_tr, y_tr, x_val, y_val, params, output_prob = False):
 
-        model = self.model_class(
-            **params, callbacks=[callback.EvaluationMonitor(rank=0, period=100)]
-        )
-        model.fit(x_tr, y_tr, eval_set=[(x_val, y_val)])
-        valid_pred = model.predict(x_val, iteration_range=(0, model.best_iteration))
+        model = self.model_class(**params)
+        model.fit(x_tr, y_tr, eval_set=[(x_val, y_val)], verbose = self.verbose_eval_step)
+        if output_prob:
+            valid_pred = model.predict_proba(x_val, iteration_range=(0, model.best_iteration))
+        else:
+            valid_pred = model.predict(x_val, iteration_range=(0, model.best_iteration))
 
         return model, valid_pred
 
-    def test(self, models, test):
-        test_pred = [
-            model.predict(test, iteration_range=(0, model.best_iteration))
-            for model in models
-        ]
+    def test(self, models, test, output_prob = False):
+        if output_prob:
+            test_pred = [
+                model.predict_proba(test, iteration_range=(0, model.best_iteration))
+                for model in models
+            ]
+        else:
+            test_pred = [
+                model.predict(test, iteration_range=(0, model.best_iteration))
+                for model in models
+            ]
         test_pred = np.mean(test_pred, axis=0)
         return test_pred
