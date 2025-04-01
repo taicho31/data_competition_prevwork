@@ -1,185 +1,154 @@
 import numpy as np
+import polars as pl
 
 from lightgbm import early_stopping, log_evaluation
-from catboost import CatBoostClassifier, CatBoostRegressor, Pool
-from xgboost import callback
+from catboost import Pool
 
 
-class Common_LGB_Modelling:
-    """
-    Train and test data should contain the same selected features for ML models.
-    Train, test data and target should be the same data type. (Pandas or Numpy)
-    """
-
-    def __init__(self, model_class, custom_callback=None):
+class BaseGBDTClass:
+    def __init__(self, model_class, params):
         self.model_class = model_class
-        self.custom_callback = custom_callback
-        self.default_callback = [
-            early_stopping(stopping_rounds=50),
-            log_evaluation(100),
-        ]
+        self.params = params
 
-    def train(self, x_tr, y_tr, params):
+    def train(self, x_tr, y_tr):
+        raise NotImplementedError("train method must be implemented")
 
-        model = self.model_class(**params)
-        model.fit(x_tr, y_tr)
+    def train_with_validation(self, x_tr, y_tr, x_val, y_val):
+        raise NotImplementedError("train_with_validation method must be implemented")
+
+    def predict(self, model, input_):
+        raise NotImplementedError("predict method must be implemented")
+
+    def extract_importance(self, model, features, imp_col_prefix=None):
+        importance = model.feature_importances_
+        if imp_col_prefix is not None:
+            importance_col = imp_col_prefix + "_importance"
+        else:
+            importance_col = "importance"
+        importance_df = pl.DataFrame({"feature": features, importance_col: importance})
+        return importance_df
+
+    def test(self, models, test):
+        test_predictions = [self.predict(model, test) for model in models]
+        test_predictions = np.mean(test_predictions, axis=0)
+        return test_predictions
+
+
+class LGBClass(BaseGBDTClass):
+    def __init__(self, cat_features="auto", custom_callback=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cat_features = cat_features
+        if custom_callback:
+            self.callbacks = custom_callback
+        else:
+            self.callbacks = [
+                early_stopping(stopping_rounds=50),
+                log_evaluation(100),
+            ]
+
+    def train(self, x_tr, y_tr):
+
+        model = self.model_class(**self.params)
+        model.fit(
+            x_tr,
+            y_tr,
+            categorical_feature=self.cat_features,
+        )
 
         return model
 
-    def train_and_valid(self, x_tr, y_tr, x_val, y_val, params, cat_features = "auto"):
+    def train_with_validation(self, x_tr, y_tr, x_val, y_val):
 
-        if self.custom_callback:
-            callbacks = self.custom_callback
+        model = self.model_class(**self.params)
+        model = model.fit(
+            x_tr,
+            y_tr,
+            eval_set=[(x_val, y_val)],
+            categorical_feature=self.cat_features,
+            callbacks=self.callbacks,
+        )
+        return model
+
+    def predict(self, model, input_):
+        predictions = model.predict(input_)
+        return predictions
+
+
+class XGBClass(BaseGBDTClass):
+    def __init__(self, verbose_eval_step: int, output_prob: bool, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.verbose_eval_step = verbose_eval_step
+        self.output_prob = output_prob
+
+    def train(self, x_tr, y_tr):
+
+        model = self.model_class(**self.params)
+        model.fit(x_tr, y_tr)
+        return model
+
+    def train_with_validation(self, x_tr, y_tr, x_val, y_val):
+
+        model = self.model_class(**self.params)
+        model.fit(x_tr, y_tr, eval_set=[(x_val, y_val)], verbose=self.verbose_eval_step)
+        return model
+
+    def predict(self, model, input_):
+        if self.output_prob:
+            predictions = model.predict_proba(
+                input_, iteration_range=(0, model.best_iteration)
+            )
         else:
-            callbacks = self.default_callback
-
-        model = self.model_class(**params)
-        model = model.fit(x_tr, y_tr, eval_set=[(x_val, y_val)], categorical_feature = cat_features, callbacks=callbacks)
-        valid_pred = model.predict(x_val)
-
-        return model, valid_pred
-
-    def test(self, models, test):
-        test_pred = [model.predict(test) for model in models]
-        test_pred = np.mean(test_pred, axis=0)
-        return test_pred
-
-    def test_by_batch(self, models, test, batch_size):
-        test_pred_all = []
-        for idx in range(0, len(test), batch_size):
-            test_pred_batch = [
-                model.predict(test.iloc[idx : idx + batch_size]) for model in models
-            ]
-            test_pred_batch = np.mean(test_pred_batch, axis=0)
-            test_pred_all.append(test_pred_batch)
-        return np.concatenate(test_pred_all)
-
-    def numpy_test_by_batch(self, models, test, batch_size):
-        test_pred_all = []
-        for idx in range(0, len(test), batch_size):
-            test_pred_batch = [
-                model.predict(test[idx : idx + batch_size]) for model in models
-            ]
-            test_pred_batch = np.mean(test_pred_batch, axis=0)
-            test_pred_all.append(test_pred_batch)
-        return np.concatenate(test_pred_all)
+            predictions = model.predict(
+                input_, iteration_range=(0, model.best_iteration)
+            )
+        return predictions
 
 
-class Common_CB_Modelling:
-    """
-    Train and test data should contain the same selected features for ML models.
-    Train, test data and target should be the same data type. (Pandas or Numpy)
-    """
+class CBClass(BaseGBDTClass):
+    def __init__(self, cat, output_prob: bool, multi_label: bool, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cat = cat
+        self.multi_label = multi_label
+        self.output_prob = output_prob
 
-    def __init__(self, model_class):
-        self.model_class = model_class
+    def train(self, x_tr, y_tr):
 
-    def train(self, x_tr, y_tr, params, cat):
+        train_pool = Pool(data=x_tr, label=y_tr, cat_features=self.cat)
 
-        train_pool = Pool(data=x_tr, label=y_tr, cat_features=cat)
-
-        model = self.model_class(**params)
+        model = self.model_class(**self.params)
         model.fit(train_pool)
 
         return model
 
-    def train_and_valid(self, x_tr, y_tr, x_val, y_val, params, cat):
-        train_pool = Pool(data=x_tr, label=y_tr, cat_features=cat)
-        valid_pool = Pool(data=x_val, label=y_val, cat_features=cat)
+    def train_with_validation(self, x_tr, y_tr, x_val, y_val):
+        train_pool = Pool(data=x_tr, label=y_tr, cat_features=self.cat)
+        valid_pool = Pool(data=x_val, label=y_val, cat_features=self.cat)
 
-        model = self.model_class(**params)
+        model = self.model_class(**self.params)
+        model.fit(
+            train_pool,
+            eval_set=[valid_pool],
+            early_stopping_rounds=50,
+            verbose_eval=100,
+        )
 
-        if isinstance(model, CatBoostClassifier):
-            model.fit(
-                train_pool,
-                eval_set=[valid_pool],
-                early_stopping_rounds=50,
-                verbose_eval=100,
-            )
-            valid_pred = model.predict_proba(x_val)#[:, 1]
-        elif isinstance(model, CatBoostRegressor):
-            model.fit(
-                train_pool,
-                eval_set=[valid_pool],
-                early_stopping_rounds=50,
-                verbose_eval=100,
-            )
-            valid_pred = model.predict(x_val)
+        return model
 
-        return model, valid_pred
-
-    def test(self, models, test):
-        if isinstance(models[0], CatBoostClassifier):
-            test_pred = [model.predict_proba(test) for model in models] # [:, 1]
-        elif isinstance(models[0], CatBoostRegressor):
-            test_pred = [model.predict(test) for model in models]
-        test_pred = np.mean(test_pred, axis=0)
-        return test_pred
-
-    def test_by_batch(self, models, test, batch_size):
-        test_pred_all = []
-        for idx in range(0, len(test), batch_size):
-            if isinstance(models[0], CatBoostClassifier):
-                test_pred_batch = [
-                    model.predict_proba(test.iloc[idx : idx + batch_size])#[:, 1]
-                    for model in models
-                ]
-            elif isinstance(models[0], CatBoostRegressor):
-                test_pred_batch = [
-                    model.predict(test.iloc[idx : idx + batch_size]) for model in models
-                ]
-            test_pred_batch = np.mean(test_pred_batch, axis=0)
-            test_pred_all.append(test_pred_batch)
-        return np.concatenate(test_pred_all)
-
-    def numpy_test_by_batch(self, models, test, batch_size):
-        test_pred_all = []
-        for idx in range(0, len(test), batch_size):
-            if isinstance(models[0], CatBoostClassifier):
-                test_pred_batch = [
-                    model.predict_proba(test[idx : idx + batch_size])[:, 1]
-                    for model in models
-                ]
-            elif isinstance(models[0], CatBoostRegressor):
-                test_pred_batch = [
-                    model.predict(test[idx : idx + batch_size]) for model in models
-                ]
-            test_pred_batch = np.mean(test_pred_batch, axis=0)
-            test_pred_all.append(test_pred_batch)
-        return np.concatenate(test_pred_all)
-
-
-class Common_XGB_Modelling:
-    """
-    Train and test data should contain the same selected features for ML models.
-    Train, test data and target should be the same data type. (Pandas or Numpy)
-    """
-
-    def __init__(self, model_class, verbose_eval_step):
-        self.model_class = model_class
-        self.verbose_eval_step = verbose_eval_step
-
-    def train_and_valid(self, x_tr, y_tr, x_val, y_val, params, output_prob = False):
-
-        model = self.model_class(**params)
-        model.fit(x_tr, y_tr, eval_set=[(x_val, y_val)], verbose = self.verbose_eval_step)
-        if output_prob:
-            valid_pred = model.predict_proba(x_val, iteration_range=(0, model.best_iteration))
+    def predict(self, model, input_):
+        if self.output_prob:
+            predictions = model.predict_proba(input_)
+            if not self.multi_label:
+                predictions = predictions[:, 1]
         else:
-            valid_pred = model.predict(x_val, iteration_range=(0, model.best_iteration))
+            predictions = model.predict(input_)
+        return predictions
 
-        return model, valid_pred
-
-    def test(self, models, test, output_prob = False):
-        if output_prob:
-            test_pred = [
-                model.predict_proba(test, iteration_range=(0, model.best_iteration))
-                for model in models
-            ]
+    def extract_importance(self, model, features, x, y, imp_col_prefix=None):
+        dataset = Pool(x[features], y)
+        importance = model.get_feature_importance(dataset)
+        if imp_col_prefix is not None:
+            importance_col = imp_col_prefix + "_importance"
         else:
-            test_pred = [
-                model.predict(test, iteration_range=(0, model.best_iteration))
-                for model in models
-            ]
-        test_pred = np.mean(test_pred, axis=0)
-        return test_pred
+            importance_col = "importance"
+        importance_df = pl.DataFrame({"feature": features, importance_col: importance})
+        return importance_df
