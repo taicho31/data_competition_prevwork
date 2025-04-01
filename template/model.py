@@ -143,9 +143,8 @@ class CBClass(BaseGBDTClass):
             predictions = model.predict(input_)
         return predictions
 
-    def extract_importance(self, model, features, x, y, imp_col_prefix=None):
-        dataset = Pool(x[features], y)
-        importance = model.get_feature_importance(dataset)
+    def extract_importance(self, model, features, imp_col_prefix=None):
+        importance = model.get_feature_importance()
         if imp_col_prefix is not None:
             importance_col = imp_col_prefix + "_importance"
         else:
