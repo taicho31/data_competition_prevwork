@@ -1,6 +1,10 @@
 import numpy as np
 import polars as pl
 
+import matplotlib.pyplot as plt
+import matplotlib_fontja
+import seaborn as sns
+
 from lightgbm import early_stopping, log_evaluation
 from catboost import Pool
 
@@ -27,6 +31,14 @@ class BaseGBDTClass:
             importance_col = "importance"
         importance_df = pl.DataFrame({"feature": features, importance_col: importance})
         return importance_df
+
+    def check_pred_distribution_diff(self, predictions, gt, title):
+        fig, ax = plt.subplots(figsize=(8, 5))
+        sns.histplot(predictions, ax=ax, label="prediction")
+        sns.histplot(gt, ax=ax, label="ground truth")
+        ax.legend()
+        ax.grid()
+        ax.set_title(title)
 
     def test(self, models, test):
         test_predictions = [self.predict(model, test) for model in models]
@@ -75,10 +87,11 @@ class LGBClass(BaseGBDTClass):
 
 
 class XGBClass(BaseGBDTClass):
-    def __init__(self, verbose_eval_step: int, output_prob: bool, *args, **kwargs):
+    def __init__(self, verbose_eval_step: int, output_prob: bool, multi_label: bool, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.verbose_eval_step = verbose_eval_step
         self.output_prob = output_prob
+        self.multi_label = multi_label
 
     def train(self, x_tr, y_tr):
 
@@ -97,6 +110,8 @@ class XGBClass(BaseGBDTClass):
             predictions = model.predict_proba(
                 input_, iteration_range=(0, model.best_iteration)
             )
+            if not self.multi_label:
+                predictions = predictions[:, 1]
         else:
             predictions = model.predict(
                 input_, iteration_range=(0, model.best_iteration)
@@ -151,3 +166,18 @@ class CBClass(BaseGBDTClass):
             importance_col = "importance"
         importance_df = pl.DataFrame({"feature": features, importance_col: importance})
         return importance_df
+
+
+def param_tuning(objective, trial_num = 5, option = "minimize"):
+                        
+    study = optuna.create_study(direction=option) 
+    study.optimize(objective, n_trials=trial_num)
+    trial = study.best_trial
+    best_parameters = trial.params
+    best_value = trial.value
+    print('Value: ', best_value)
+    print('best_parameters: ', best_parameters)
+
+    optuna.visualization.plot_param_importances(study).show()
+
+    return best_parameters, best_value
