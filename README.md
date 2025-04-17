@@ -9,6 +9,8 @@
 - 08_Indoor2021: https://www.kaggle.com/competitions/indoor-location-navigation
 - 09_HMrecom2022: https://www.kaggle.com/c/h-and-m-personalized-fashion-recommendations/
 - 10_Ottorecom2022: https://www.kaggle.com/competitions/otto-recommender-system/ 
+- 11_ICR2023: https://www.kaggle.com/competitions/icr-identify-age-related-conditions
+- 12_HomeCredit2024: https://www.kaggle.com/competitions/home-credit-credit-risk-model-stability
 # atma
 - atma20200125: https://atma.connpass.com/event/161251/
 - atma20200529: https://atma.connpass.com/event/175139/
