@@ -8,6 +8,8 @@ import seaborn as sns
 from lightgbm import early_stopping, log_evaluation
 from catboost import Pool
 
+import optuna
+
 
 class BaseGBDTClass:
     def __init__(self, model_class, params):
@@ -168,9 +170,9 @@ class CBClass(BaseGBDTClass):
         return importance_df
 
 
-def param_tuning(objective, trial_num = 5, option = "minimize"):
-                        
-    study = optuna.create_study(direction=option) 
+def param_tuning(objective, trial_num = 5, option = "minimize", plot_importance = False):
+
+    study = optuna.create_study(direction=option)
     study.optimize(objective, n_trials=trial_num)
     trial = study.best_trial
     best_parameters = trial.params
@@ -178,6 +180,7 @@ def param_tuning(objective, trial_num = 5, option = "minimize"):
     print('Value: ', best_value)
     print('best_parameters: ', best_parameters)
 
-    optuna.visualization.plot_param_importances(study).show()
+    if plot_importance:
+        optuna.visualization.plot_param_importances(study).show()
 
     return best_parameters, best_value
