@@ -2,7 +2,6 @@ import numpy as np
 import polars as pl
 
 import matplotlib.pyplot as plt
-import matplotlib_fontja
 import seaborn as sns
 
 from lightgbm import early_stopping, log_evaluation
